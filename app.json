@@ -9,7 +9,8 @@
     "updates": {
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/47075554-e137-41bc-8635-35692cab9c49"
     },
     "runtimeVersion": {
       "policy": "appVersion"
@@ -23,8 +24,10 @@
         "expo-build-properties",
         {
           "android": {
+            "newArchEnabled": false,
             "enableProguardInReleaseBuilds": false,
-            "extraProguardRules": "-keep class expo.modules.** { *; }\n-dontwarn expo.modules.**\n-dontwarn **"
+            "extraProguardRules": "-keep class expo.modules.** { *; }\n-dontwarn expo.modules.**\n-dontwarn **",
+            "enableMinifyInReleaseBuilds": false
           }
         }
       ]
@@ -34,7 +37,7 @@
     },
     "android": {
       "package": "com.yousef.cargame",
-      "versionCode": 1,
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#0A0D14"
       }

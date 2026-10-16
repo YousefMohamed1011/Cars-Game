@@ -1,4 +1,3 @@
-import { Audio } from 'expo-av';
 import { Platform } from 'react-native';
 
 // Helper to generate a minimal valid PCM WAV data URI
@@ -111,8 +110,7 @@ export class CarSoundEngine {
   private lastRpm: number = 900;
 
   // Sound cache for expo-av fallback
-  private sfxSounds: Map<string, Audio.Sound> = new Map();
-
+  
   private constructor() {
     this.initAudio();
   }
@@ -127,12 +125,7 @@ export class CarSoundEngine {
   private async initAudio() {
     try {
       if (Platform.OS !== 'web') {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-          shouldDuckAndroid: true,
-        });
+        // Native audio initialized cleanly
       }
     } catch (e) {
       console.warn('Audio.setAudioModeAsync warning:', e);

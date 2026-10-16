@@ -5,7 +5,8 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
@@ -15,7 +16,8 @@
       "env": {
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
         "EAS_SKIP_AUTO_FINGERPRINT": "1"
-      }
+      },
+      "channel": "preview"
     },
     "production": {
       "android": {
@@ -24,7 +26,8 @@
       "env": {
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
         "EAS_SKIP_AUTO_FINGERPRINT": "1"
-      }
+      },
+      "channel": "production"
     }
   }
 }
