@@ -1,24 +1,24 @@
 {
   "expo": {
-    "name": "CarGame",
-    "slug": "CarGame",
+    "name": "Life on Wheels: The Real Life Simulator",
+    "slug": "life-on-wheels",
     "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "orientation": "landscape",
+    "scheme": "lifeonwheels",
+    "userInterfaceStyle": "dark",
+    "plugins": [
+      "expo-router"
+    ],
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      },
-      "predictiveBackGestureEnabled": false
+        "backgroundColor": "#0A0D14"
+      }
     },
     "web": {
+      "bundler": "metro",
       "favicon": "./assets/favicon.png"
     }
   }
