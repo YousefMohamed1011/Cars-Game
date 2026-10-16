@@ -37,7 +37,7 @@
     },
     "android": {
       "package": "com.yousef.cargame",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
