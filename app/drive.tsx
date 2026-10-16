@@ -420,9 +420,22 @@ export default function DriveScreen() {
       }
     }
 
-    // 9. Update City Environment & Mission Checkpoints
+    // 9. Update City Environment, Traffic & Mission Checkpoints
     if (cityEnvRef.current) {
-      cityEnvRef.current.updateAnimation(time);
+      cityEnvRef.current.updateAnimation(time, clampedDelta, p.posX, p.posZ, p.speedKmh);
+
+      // Check Ambient Traffic Collision
+      if (cityEnvRef.current.checkTrafficCollision(p.posX, p.posZ, 1.8)) {
+        soundEngine.playCollision(0.85);
+        if (Platform.OS !== 'web') {
+          try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+          } catch {}
+        }
+        p.speedKmh = Math.max(0, p.speedKmh * 0.45);
+        p.driftPoints = 0;
+      }
+
       const activeCp = missionManager.getActiveCheckpoint();
       if (activeCp) {
         cityEnvRef.current.setCheckpointPosition(activeCp.x, activeCp.z, true);
@@ -479,6 +492,31 @@ export default function DriveScreen() {
       try {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       } catch {}
+    }
+
+    // High Beam Strobe ("رعاش النور العالي مع الكلاكس")
+    if (car3DRef.current) {
+      const initialHeadlights = physicsRef.current.headlightsOn;
+      const strobeTimers = [0, 75, 150, 225, 300];
+      strobeTimers.forEach((delay, idx) => {
+        setTimeout(() => {
+          if (car3DRef.current) {
+            const isStrobeOn = idx % 2 === 0;
+            car3DRef.current.setHeadlights(isStrobeOn);
+          }
+        }, delay);
+      });
+      // Restore state after strobe completes
+      setTimeout(() => {
+        if (car3DRef.current) {
+          car3DRef.current.setHeadlights(initialHeadlights);
+        }
+      }, 400);
+    }
+
+    // Alert ambient traffic cars ahead to yield lane
+    if (cityEnvRef.current) {
+      cityEnvRef.current.onPlayerHorn(physicsRef.current.posX, physicsRef.current.posZ);
     }
   };
 
