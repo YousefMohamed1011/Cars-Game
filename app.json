@@ -16,7 +16,18 @@
     },
     "plugins": [
       "expo-router",
-      "expo-updates"
+      "expo-updates",
+      "expo-font",
+      "expo-asset",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": false,
+            "extraProguardRules": "-keep class expo.modules.** { *; }\n-dontwarn expo.modules.**\n-dontwarn **"
+          }
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": true
