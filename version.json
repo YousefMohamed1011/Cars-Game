@@ -11,6 +11,7 @@
     "Realistic Procedural Sound Engine with Live RPM & Tire Screech Audio",
     "In-App Auto-Update System & Direct MediaFire APK Download"
   ],
-  "apkDownloadUrl": "https://www.mediafire.com/file/cargame_v1.0.0.apk/file",
-  "otaUpdateEnabled": true
+  "apkDownloadUrl": "https://expo.dev/artifacts/eas/5kssW_Vj5EEF4FnTFrPwBAP6Hae9zCKvR3wER_paKWU.apk",
+  "otaUpdateEnabled": true,
+  "buildWebUrl": "https://expo.dev/accounts/yousef1011/projects/life-on-wheels/builds/fe16614d-4a95-464f-81af-41480a983662"
 }
