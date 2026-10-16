@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "versionCode": 1,
+  "versionCode": 2,
   "releaseDate": "2026-10-16",
   "minSupportedVersion": "1.0.0",
   "changelog": [
@@ -11,7 +11,7 @@
     "Realistic Procedural Sound Engine with Live RPM & Tire Screech Audio",
     "In-App Auto-Update System & Direct MediaFire APK Download"
   ],
-  "apkDownloadUrl": "https://expo.dev/artifacts/eas/5kssW_Vj5EEF4FnTFrPwBAP6Hae9zCKvR3wER_paKWU.apk",
+  "apkDownloadUrl": "https://expo.dev/artifacts/eas/2siciXuUAkOwPetQUhsy_IlYw3Ftjodh8lkp7_3vVKA.apk",
   "otaUpdateEnabled": true,
-  "buildWebUrl": "https://expo.dev/accounts/yousef1011/projects/life-on-wheels/builds/fe16614d-4a95-464f-81af-41480a983662"
+  "buildWebUrl": "https://expo.dev/accounts/yousef1011/projects/life-on-wheels/builds/0bfd81ed-0ed2-44a2-9102-688e77d4fcf1"
 }
