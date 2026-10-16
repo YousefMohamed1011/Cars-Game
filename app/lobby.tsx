@@ -27,6 +27,7 @@ import { useGameStore } from '../src/store/gameStore';
 import { soundEngine } from '../src/audio/SoundEngine';
 import { MISSIONS_LIST, missionManager } from '../src/missions/MissionManager';
 import { SteeringControlMode } from '../src/types';
+import { updateService, UpdateCheckResult } from '../src/services/UpdateService';
 
 export default function LobbyScreen() {
   const router = useRouter();
@@ -55,6 +56,51 @@ export default function LobbyScreen() {
     'lobby' | 'garage' | 'map' | 'missions' | 'server'
   >('lobby');
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+
+  // Auto-Update & OTA State
+  const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [isUpdatingOta, setIsUpdatingOta] = useState(false);
+  const [updateProgress, setUpdateProgress] = useState(0);
+  const [updateStatusMsg, setUpdateStatusMsg] = useState('');
+
+  // Auto check for updates on startup
+  useEffect(() => {
+    updateService.checkForUpdates().then((res) => {
+      setUpdateInfo(res);
+      if (res.isUpdateAvailable) {
+        setShowUpdateModal(true);
+      }
+    });
+  }, []);
+
+  const handleManualCheckUpdates = async () => {
+    setUpdateStatusMsg('Checking server for updates...');
+    const res = await updateService.checkForUpdates();
+    setUpdateInfo(res);
+    if (res.isUpdateAvailable) {
+      setShowUpdateModal(true);
+      setUpdateStatusMsg('');
+    } else {
+      setUpdateStatusMsg(`Latest version installed (v${res.currentVersion})`);
+    }
+  };
+
+  const handleApplyOtaUpdate = async () => {
+    setIsUpdatingOta(true);
+    setUpdateProgress(20);
+    const success = await updateService.downloadAndApplyOtaUpdate((p) => {
+      setUpdateProgress(p);
+    });
+    if (!success) {
+      setIsUpdatingOta(false);
+      setUpdateStatusMsg('OTA bundle applied or requires direct APK download.');
+    }
+  };
+
+  const handleDownloadApkMediafire = () => {
+    updateService.openDownloadLink(updateInfo?.apkDownloadUrl);
+  };
 
   // 3D Scene Refs
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -297,6 +343,17 @@ export default function LobbyScreen() {
                 {profile.cash.toLocaleString()}
               </Text>
             </View>
+
+            {/* Update Notification Badge if available */}
+            {updateInfo?.isUpdateAvailable && (
+              <TouchableOpacity
+                style={styles.updateAvailableBtn}
+                onPress={() => setShowUpdateModal(true)}
+              >
+                <Ionicons name="cloud-download" size={13} color="#f59e0b" />
+                <Text style={styles.updateAvailableText}>UPDATE v{updateInfo.latestVersion}</Text>
+              </TouchableOpacity>
+            )}
 
             {/* Server Status Badge */}
             <View style={styles.serverStatusBadge}>
@@ -803,7 +860,148 @@ export default function LobbyScreen() {
                   );
                 })}
               </View>
+
+              {/* Game Version & Updates Section */}
+              <Text style={styles.configSectionTitle}>GAME VERSION & OVER-THE-AIR UPDATES</Text>
+              <View style={styles.updateSettingsCard}>
+                <View style={styles.updateVersionRow}>
+                  <View>
+                    <Text style={styles.updateVersionTitle}>LIFE ON WHEELS 3D</Text>
+                    <Text style={styles.updateVersionSub}>Current Installed: v{updateService.getCurrentVersion()}</Text>
+                  </View>
+                  <View style={styles.otaBadge}>
+                    <View style={styles.greenDot} />
+                    <Text style={styles.otaBadgeText}>OTA AUTO-UPDATES READY</Text>
+                  </View>
+                </View>
+
+                {updateStatusMsg ? (
+                  <Text style={styles.updateStatusText}>{updateStatusMsg}</Text>
+                ) : null}
+
+                <View style={styles.updateActionButtonsRow}>
+                  <TouchableOpacity
+                    style={styles.checkUpdateBtn}
+                    onPress={handleManualCheckUpdates}
+                  >
+                    <Ionicons name="refresh" size={16} color="#00f0ff" />
+                    <Text style={styles.checkUpdateBtnText}>CHECK FOR UPDATES</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.mediafireBtn}
+                    onPress={handleDownloadApkMediafire}
+                  >
+                    <Ionicons name="download-outline" size={16} color="#f59e0b" />
+                    <Text style={styles.mediafireBtnText}>DOWNLOAD APK (MEDIAFIRE)</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* UPDATE MODAL */}
+      <Modal visible={showUpdateModal} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.updateModalBox}>
+            <View style={styles.updateModalHeader}>
+              <View style={styles.modalTitleRow}>
+                <Ionicons name="cloud-download" size={24} color="#00f0ff" />
+                <Text style={styles.modalTitle}>NEW UPDATE AVAILABLE</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowUpdateModal(false)}
+                style={styles.modalCloseBtn}
+              >
+                <Ionicons name="close" size={20} color="#cbd5e1" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.updateModalBody}>
+              {/* Version Comparison */}
+              <View style={styles.versionCompareRow}>
+                <View style={styles.verBadge}>
+                  <Text style={styles.verBadgeLabel}>CURRENT</Text>
+                  <Text style={styles.verBadgeVal}>v{updateInfo?.currentVersion || '1.0.0'}</Text>
+                </View>
+
+                <Ionicons name="arrow-forward" size={20} color="#00f0ff" />
+
+                <View style={[styles.verBadge, styles.verBadgeNew]}>
+                  <Text style={styles.verBadgeLabel}>LATEST</Text>
+                  <Text style={styles.verBadgeValNew}>v{updateInfo?.latestVersion || '1.1.0'}</Text>
+                </View>
+              </View>
+
+              {/* Changelog */}
+              <Text style={styles.changelogTitle}>WHAT'S NEW IN THIS UPDATE:</Text>
+              <ScrollView style={styles.changelogScroll}>
+                {(updateInfo?.changelog && updateInfo.changelog.length > 0
+                  ? updateInfo.changelog
+                  : [
+                      'Brand new features & vehicle physics updates',
+                      'Improved 3D realistic graphics & lighting',
+                      'Engine sound & performance optimizations',
+                      'Over-the-Air hot-patching without app reinstallation',
+                    ]
+                ).map((item, i) => (
+                  <View key={i} style={styles.changelogItem}>
+                    <Ionicons name="checkmark-circle" size={14} color="#00f0ff" />
+                    <Text style={styles.changelogText}>{item}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+
+              {/* Progress Bar (if downloading) */}
+              {isUpdatingOta && (
+                <View style={styles.updateProgressContainer}>
+                  <Text style={styles.updateProgressText}>
+                    Downloading & applying update... {updateProgress}%
+                  </Text>
+                  <View style={styles.progressBarTrack}>
+                    <View
+                      style={[
+                        styles.progressBarFill,
+                        { width: `${updateProgress}%` },
+                      ]}
+                    />
+                  </View>
+                </View>
+              )}
+
+              {/* Action Buttons */}
+              <View style={styles.updateButtonsRow}>
+                <TouchableOpacity
+                  style={styles.applyOtaBtn}
+                  onPress={handleApplyOtaUpdate}
+                  disabled={isUpdatingOta}
+                >
+                  <LinearGradient
+                    colors={['#00f0ff', '#0284c7']}
+                    style={styles.applyOtaGradient}
+                  >
+                    <Ionicons name="flash" size={18} color="#030712" />
+                    <Text style={styles.applyOtaText}>
+                      {isUpdatingOta
+                        ? 'UPDATING...'
+                        : 'UPDATE NOW (WITHOUT REINSTALL)'}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.downloadApkFullBtn}
+                  onPress={handleDownloadApkMediafire}
+                >
+                  <Ionicons name="logo-android" size={18} color="#10b981" />
+                  <Text style={styles.downloadApkFullText}>
+                    DOWNLOAD FULL APK (MEDIAFIRE)
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1494,6 +1692,243 @@ const styles = StyleSheet.create({
   },
   volBtnTextSelected: {
     color: '#00f0ff',
+    fontWeight: '800',
+  },
+  updateAvailableBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(245, 158, 11, 0.18)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+  },
+  updateAvailableText: {
+    color: '#f59e0b',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  updateSettingsCard: {
+    backgroundColor: 'rgba(2, 6, 23, 0.8)',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 240, 255, 0.25)',
+    marginBottom: 10,
+  },
+  updateVersionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  updateVersionTitle: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  updateVersionSub: {
+    color: '#94a3b8',
+    fontSize: 10,
+    marginTop: 2,
+  },
+  otaBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+  },
+  otaBadgeText: {
+    color: '#10b981',
+    fontSize: 8,
+    fontWeight: '800',
+  },
+  updateStatusText: {
+    color: '#38bdf8',
+    fontSize: 10,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  updateActionButtonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  checkUpdateBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0, 240, 255, 0.12)',
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 240, 255, 0.4)',
+  },
+  checkUpdateBtnText: {
+    color: '#00f0ff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  mediafireBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+  },
+  mediafireBtnText: {
+    color: '#f59e0b',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  updateModalBox: {
+    width: '68%',
+    maxWidth: 540,
+    backgroundColor: 'rgba(15, 23, 42, 0.98)',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 240, 255, 0.4)',
+    overflow: 'hidden',
+  },
+  updateModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  updateModalBody: {
+    padding: 16,
+  },
+  versionCompareRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    marginBottom: 12,
+    backgroundColor: 'rgba(2, 6, 23, 0.7)',
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  verBadge: {
+    alignItems: 'center',
+  },
+  verBadgeNew: {},
+  verBadgeLabel: {
+    color: '#64748b',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  verBadgeVal: {
+    color: '#cbd5e1',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  verBadgeValNew: {
+    color: '#00f0ff',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  changelogTitle: {
+    color: '#cbd5e1',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    marginBottom: 6,
+  },
+  changelogScroll: {
+    maxHeight: 90,
+    backgroundColor: 'rgba(2, 6, 23, 0.6)',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 12,
+  },
+  changelogItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  changelogText: {
+    color: '#94a3b8',
+    fontSize: 10,
+    fontWeight: '600',
+    flex: 1,
+  },
+  updateProgressContainer: {
+    marginBottom: 10,
+  },
+  updateProgressText: {
+    color: '#00f0ff',
+    fontSize: 10,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  progressBarTrack: {
+    width: '100%',
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#00f0ff',
+  },
+  updateButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  applyOtaBtn: {
+    flex: 1.2,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  applyOtaGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+  },
+  applyOtaText: {
+    color: '#030712',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  downloadApkFullBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+  },
+  downloadApkFullText: {
+    color: '#10b981',
+    fontSize: 10,
     fontWeight: '800',
   },
 });

@@ -6,13 +6,24 @@
     "orientation": "landscape",
     "scheme": "lifeonwheels",
     "userInterfaceStyle": "dark",
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-updates"
     ],
     "ios": {
       "supportsTablet": true
     },
     "android": {
+      "package": "com.yousef.cargame",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#0A0D14"
       }
