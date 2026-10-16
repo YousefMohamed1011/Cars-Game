@@ -39,6 +39,8 @@
       "package": "com.yousef.cargame",
       "versionCode": 2,
       "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
         "backgroundColor": "#0A0D14"
       }
     },
@@ -55,6 +57,7 @@
       "eas": {
         "projectId": "47075554-e137-41bc-8635-35692cab9c49"
       }
-    }
+    },
+    "icon": "./assets/icon.png"
   }
 }
