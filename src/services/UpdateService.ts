@@ -1,4 +1,6 @@
 import * as Updates from 'expo-updates';
+import { File, Paths } from 'expo-file-system';
+import Constants from 'expo-constants';
 import { Platform, Linking } from 'react-native';
 
 export interface VersionManifest {
@@ -21,7 +23,7 @@ export interface UpdateCheckResult {
   releaseDate?: string;
 }
 
-const CURRENT_APP_VERSION = '1.0.0';
+const CURRENT_APP_VERSION = Constants.expoConfig?.version || '1.0.0';
 const REMOTE_VERSION_URL =
   'https://raw.githubusercontent.com/YousefMohamed1011/Cars-Game/main/version.json';
 
@@ -47,12 +49,13 @@ class UpdateService {
     let isNewVersionAvailable = false;
     let latestVersion = CURRENT_APP_VERSION;
     let changelog: string[] = [];
-    let apkDownloadUrl = 'https://www.mediafire.com';
+    let apkDownloadUrl =
+      'https://expo.dev/artifacts/eas/PAgPkXkwBf9FQcdDmuc0cuN_0yrmLbMxUAS8FrN3SAs.apk';
     let releaseDate = '';
 
-    // 1. Check Expo Updates Native OTA (if running on a standalone native build)
+    // 1. Check Expo Updates Native OTA if enabled on standalone build
     try {
-      if (!__DEV__ && Platform.OS !== 'web') {
+      if (!__DEV__ && Platform.OS !== 'web' && Updates.isEnabled) {
         const update = await Updates.checkForUpdateAsync();
         if (update.isAvailable) {
           isOtaAvailable = true;
@@ -60,7 +63,6 @@ class UpdateService {
         }
       }
     } catch (e) {
-      // In development or web, Updates.checkForUpdateAsync may throw or not be supported
       console.log('Native OTA check info:', e);
     }
 
@@ -94,40 +96,90 @@ class UpdateService {
     };
   }
 
+  /**
+   * Attempts to download and apply an OTA bundle via Expo Updates.
+   */
   public async downloadAndApplyOtaUpdate(
     onProgress?: (progress: number) => void
   ): Promise<boolean> {
     try {
-      if (Platform.OS === 'web') return false;
+      if (Platform.OS === 'web' || !Updates.isEnabled) return false;
 
       if (onProgress) onProgress(20);
 
-      // Fetch the OTA update bundle
       const fetchResult = await Updates.fetchUpdateAsync();
       if (onProgress) onProgress(80);
 
       if (fetchResult.isNew) {
         if (onProgress) onProgress(100);
-        // Reload app into the new update bundle seamlessly
         await Updates.reloadAsync();
         return true;
       }
       return false;
     } catch (error) {
-      console.warn('OTA update download failed:', error);
+      console.warn('OTA update download failed or unavailable:', error);
       return false;
     }
   }
 
-  public async openDownloadLink(url?: string): Promise<void> {
-    const targetUrl = url || this.cachedManifest?.apkDownloadUrl || 'https://www.mediafire.com';
+  /**
+   * Downloads the APK file to device storage with live download progress.
+   */
+  public async downloadApkFile(
+    url?: string,
+    onProgress?: (progress: number) => void
+  ): Promise<{ success: boolean; uri?: string; error?: string }> {
+    const targetUrl = url || this.cachedManifest?.apkDownloadUrl;
+    if (!targetUrl) {
+      return { success: false, error: 'No download URL specified' };
+    }
+
     try {
-      const supported = await Linking.canOpenURL(targetUrl);
-      if (supported) {
-        await Linking.openURL(targetUrl);
+      if (Platform.OS === 'web') {
+        window.open(targetUrl, '_blank');
+        return { success: true, uri: targetUrl };
       }
+
+      if (onProgress) onProgress(20);
+
+      const downloadedFile = await File.downloadFileAsync(
+        targetUrl,
+        Paths.document,
+        { idempotent: true }
+      );
+
+      if (onProgress) onProgress(100);
+      return { success: true, uri: downloadedFile.uri };
+    } catch (err: any) {
+      console.warn('In-app APK download error:', err);
+      return { success: false, error: err?.message || 'Download error' };
+    }
+  }
+
+  /**
+   * Opens the download link directly in the device browser / download manager.
+   * Directly calls Linking.openURL without canOpenURL blocking on modern Android.
+   */
+  public async openDownloadLink(url?: string): Promise<boolean> {
+    const targetUrl =
+      url ||
+      this.cachedManifest?.apkDownloadUrl ||
+      'https://expo.dev/artifacts/eas/PAgPkXkwBf9FQcdDmuc0cuN_0yrmLbMxUAS8FrN3SAs.apk';
+    try {
+      await Linking.openURL(targetUrl);
+      return true;
     } catch (e) {
-      console.warn('Cannot open download URL:', e);
+      console.warn('Direct Linking.openURL failed, trying fallback:', e);
+      try {
+        const supported = await Linking.canOpenURL(targetUrl);
+        if (supported) {
+          await Linking.openURL(targetUrl);
+          return true;
+        }
+      } catch (err2) {
+        console.warn('Linking fallback error:', err2);
+      }
+      return false;
     }
   }
 

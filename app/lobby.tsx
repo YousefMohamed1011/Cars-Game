@@ -88,14 +88,47 @@ export default function LobbyScreen() {
 
   const handleApplyOtaUpdate = async () => {
     setIsUpdatingOta(true);
-    setUpdateProgress(20);
-    const success = await updateService.downloadAndApplyOtaUpdate((p) => {
-      setUpdateProgress(p);
-    });
-    if (!success) {
-      setIsUpdatingOta(false);
-      setUpdateStatusMsg('OTA bundle applied or requires direct APK download.');
+    setUpdateProgress(10);
+    setUpdateStatusMsg('جاري فحص وتنزيل التحديث...');
+
+    // 1. If OTA is available and enabled on device, try OTA first
+    if (updateInfo?.isOtaAvailable) {
+      const otaSuccess = await updateService.downloadAndApplyOtaUpdate((p) => {
+        setUpdateProgress(p);
+      });
+      if (otaSuccess) {
+        return;
+      }
     }
+
+    // 2. Direct APK Download Flow
+    const downloadUrl =
+      updateInfo?.apkDownloadUrl ||
+      'https://expo.dev/artifacts/eas/PAgPkXkwBf9FQcdDmuc0cuN_0yrmLbMxUAS8FrN3SAs.apk';
+
+    setUpdateStatusMsg('بدأ تنزيل ملف التحديث! افتح شريط إشعارات الهاتف');
+    // Open in browser so Android download manager handles the 97MB APK download in background
+    await updateService.openDownloadLink(downloadUrl);
+
+    // Also download in-app with progress bar feedback
+    updateService
+      .downloadApkFile(downloadUrl, (pct) => {
+        setUpdateProgress(Math.max(15, pct));
+        if (pct >= 100) {
+          setUpdateStatusMsg('تم اكتمال تنزيل التحديث! راجع شريط الإشعارات لتثبيته');
+          setIsUpdatingOta(false);
+        }
+      })
+      .then((res) => {
+        setIsUpdatingOta(false);
+        if (res.success) {
+          setUpdateProgress(100);
+          setUpdateStatusMsg('تم اكتمال التنزيل بنجاح! راجع الإشعارات للتثبيت');
+        }
+      })
+      .catch(() => {
+        setIsUpdatingOta(false);
+      });
   };
 
   const handleDownloadApkMediafire = () => {
@@ -971,6 +1004,13 @@ export default function LobbyScreen() {
                 </View>
               )}
 
+              {/* Status feedback message inside modal */}
+              {updateStatusMsg ? (
+                <View style={styles.modalStatusBox}>
+                  <Text style={styles.modalStatusText}>{updateStatusMsg}</Text>
+                </View>
+              ) : null}
+
               {/* Action Buttons */}
               <View style={styles.updateButtonsRow}>
                 <TouchableOpacity
@@ -982,11 +1022,13 @@ export default function LobbyScreen() {
                     colors={['#00f0ff', '#0284c7']}
                     style={styles.applyOtaGradient}
                   >
-                    <Ionicons name="flash" size={18} color="#030712" />
+                    <Ionicons name="cloud-download" size={18} color="#030712" />
                     <Text style={styles.applyOtaText}>
                       {isUpdatingOta
-                        ? 'UPDATING...'
-                        : 'UPDATE NOW (WITHOUT REINSTALL)'}
+                        ? `DOWNLOADING... ${updateProgress}%`
+                        : updateInfo?.isOtaAvailable
+                        ? 'UPDATE NOW (OTA HOT-PATCH)'
+                        : 'UPDATE NOW (DOWNLOAD APK)'}
                     </Text>
                   </LinearGradient>
                 </TouchableOpacity>
@@ -995,9 +1037,9 @@ export default function LobbyScreen() {
                   style={styles.downloadApkFullBtn}
                   onPress={handleDownloadApkMediafire}
                 >
-                  <Ionicons name="logo-android" size={18} color="#10b981" />
+                  <Ionicons name="open-outline" size={18} color="#10b981" />
                   <Text style={styles.downloadApkFullText}>
-                    DOWNLOAD FULL APK (MEDIAFIRE)
+                    DIRECT BROWSER LINK
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1871,6 +1913,21 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     flex: 1,
+  },
+  modalStatusBox: {
+    backgroundColor: 'rgba(0, 240, 255, 0.12)',
+    borderColor: '#00f0ff',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+  },
+  modalStatusText: {
+    color: '#00f0ff',
+    fontSize: 10,
+    fontWeight: '800',
+    textAlign: 'center',
   },
   updateProgressContainer: {
     marginBottom: 10,

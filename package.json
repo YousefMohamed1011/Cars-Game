@@ -46,7 +46,8 @@
     "web": "expo start --web",
     "build:apk": "npx eas-cli@latest build -p android --profile preview",
     "build:apk:prod": "npx eas-cli@latest build -p android --profile production",
-    "update:ota": "npx eas-cli@latest update --branch production --message 'Hotfix update'"
+    "update:ota": "npx eas-cli@latest update --branch production --message 'Hotfix update'",
+    "update:ota:preview": "npx eas-cli@latest update --branch preview --message 'Hotfix update'"
   },
   "private": true,
   "expo": {
