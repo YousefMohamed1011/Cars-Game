@@ -2,7 +2,7 @@
   "expo": {
     "name": "Life on Wheels: The Real Life Simulator",
     "slug": "life-on-wheels",
-    "version": "1.0.0",
+    "version": "1.2.0",
     "orientation": "landscape",
     "scheme": "lifeonwheels",
     "userInterfaceStyle": "dark",
@@ -37,7 +37,7 @@
     },
     "android": {
       "package": "com.yousef.cargame",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
