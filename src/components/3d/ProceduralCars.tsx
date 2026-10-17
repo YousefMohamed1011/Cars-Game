@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CarSpecs, CarCustomization } from '../../types';
+import { buildRealisticCar } from './RealisticCarBuilder';
 
 export interface Car3DObject {
   group: THREE.Group;
@@ -1809,13 +1810,5 @@ export function buildBmwE30(specs: CarSpecs, custom: CarCustomization): Car3DObj
 
 // Master Factory function
 export function createCar3D(specs: CarSpecs, custom: CarCustomization): Car3DObject {
-  switch (specs.id) {
-    case 'optra_2012':
-      return buildOptra2012(specs, custom);
-    case 'bmw_e30':
-      return buildBmwE30(specs, custom);
-    case 'fiat_132':
-    default:
-      return buildFiat132(specs, custom);
-  }
+  return buildRealisticCar(specs, custom);
 }

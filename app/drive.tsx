@@ -24,6 +24,9 @@ import { useGameStore } from '../src/store/gameStore';
 import { soundEngine } from '../src/audio/SoundEngine';
 import { missionManager } from '../src/missions/MissionManager';
 import { CameraViewMode, SteeringControlMode } from '../src/types';
+import { setupSceneGraphics, createDynamicCameraController, DynamicCameraController } from '../src/graphics/SceneSetup';
+import { NearMissEvent } from '../src/world/TrafficManager';
+import { loadCarModelAsync } from '../src/resources/ModelLoader';
 
 export default function DriveScreen() {
   const router = useRouter();
@@ -50,6 +53,11 @@ export default function DriveScreen() {
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const car3DRef = useRef<Car3DObject | null>(null);
   const cityEnvRef = useRef<CityEnvironment | null>(null);
+  const cameraControllerRef = useRef<DynamicCameraController>(createDynamicCameraController());
+
+  // Near-Miss / Weave Bonus State
+  const [weaveNotice, setWeaveNotice] = useState<{ show: boolean; text: string; bonus: number } | null>(null);
+  const weaveNoticeTimeoutRef = useRef<any>(null);
 
   // Vehicle Simulation Physics State (Ref for 60fps loop)
   const physicsRef = useRef({
@@ -163,6 +171,26 @@ export default function DriveScreen() {
     };
   }, [selectedCarSpec.soundProfile]);
 
+  // Near-Miss / Weave Bonus Callback
+  const handleNearMiss = (evt: NearMissEvent) => {
+    if (cameraControllerRef.current) {
+      cameraControllerRef.current.triggerNearMissShake(1.6);
+    }
+    soundEngine.playTireScreech(0.5);
+    if (Platform.OS !== 'web') {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch {}
+    }
+    physicsRef.current.driftPoints += evt.points;
+    missionManager.addDriftPoints(evt.points);
+    setWeaveNotice({ show: true, text: `WEAVE BONUS +${evt.points} (غرزة)`, bonus: evt.points });
+    if (weaveNoticeTimeoutRef.current) clearTimeout(weaveNoticeTimeoutRef.current);
+    weaveNoticeTimeoutRef.current = setTimeout(() => {
+      setWeaveNotice(null);
+    }, 1800);
+  };
+
   // Scene Ready Callback
   const handleSceneReady = (
     scene: THREE.Scene,
@@ -172,25 +200,27 @@ export default function DriveScreen() {
     sceneRef.current = scene;
     cameraRef.current = camera;
 
-    // Ambient Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-    scene.add(ambientLight);
+    // AAA Scene Lighting, ACESFilmic Tone Mapping & Golden-Hour Atmospheric Fog
+    setupSceneGraphics(scene, camera, renderer);
 
-    // Directional Sunlight / Moon Night Light
-    const sunLight = new THREE.DirectionalLight(0xe2e8f0, 1.8);
-    sunLight.position.set(40, 60, 30);
-    sunLight.castShadow = true;
-    scene.add(sunLight);
-
-    // City Environment
-    const cityEnv = createCityEnvironment();
+    // City Environment with Endless Road Streaming and Intelligent AI Traffic
+    const cityEnv = createCityEnvironment(handleNearMiss);
     scene.add(cityEnv.group);
     cityEnvRef.current = cityEnv;
 
-    // Build and spawn vehicle
+    // Build vehicle
     const car3D = createCar3D(selectedCarSpec, currentCustomization);
     scene.add(car3D.group);
     car3DRef.current = car3D;
+
+    // Asynchronous Real GLB enrichment
+    loadCarModelAsync(selectedCarSpec, currentCustomization).then((loadedCar) => {
+      if (loadedCar && loadedCar.group !== car3D.group) {
+        scene.remove(car3D.group);
+        scene.add(loadedCar.group);
+        car3DRef.current = loadedCar;
+      }
+    });
   };
 
   // Main 60 FPS Physics & Simulation Loop
@@ -355,69 +385,17 @@ export default function DriveScreen() {
       car3DRef.current.updateCockpitTelemetry(p.speedKmh, p.rpm, p.gear, p.steeringAngle);
     }
 
-    // 8. Update Camera Follow Logic
-    if (cameraRef.current) {
-      const cam = cameraRef.current;
-      const yaw = p.yaw + p.driftAngle;
-
-      switch (p.cameraMode) {
-        case 'cockpit':
-          // Authentic First-Person Driver POV (seated at driver position looking at dash, wheel & road)
-          const driverLateralOffset = -0.38; // Left-hand drive seat
-          const driverLongitudinalOffset = 0.04;
-          const driverEyeHeight = 1.08;
-          const cosY = Math.cos(yaw);
-          const sinY = Math.sin(yaw);
-
-          const eyeX = p.posX + cosY * driverLateralOffset + sinY * driverLongitudinalOffset;
-          const eyeZ = p.posZ - sinY * driverLateralOffset + cosY * driverLongitudinalOffset;
-
-          cam.position.set(eyeX, driverEyeHeight, eyeZ);
-          cam.lookAt(
-            eyeX + sinY * 22,
-            driverEyeHeight - 0.14,
-            eyeZ + cosY * 22
-          );
-          break;
-
-        case 'hood':
-          // Front hood cam
-          cam.position.set(
-            p.posX + Math.sin(yaw) * 1.5,
-            0.85,
-            p.posZ + Math.cos(yaw) * 1.5
-          );
-          cam.lookAt(
-            p.posX + Math.sin(yaw) * 25,
-            0.7,
-            p.posZ + Math.cos(yaw) * 25
-          );
-          break;
-
-        case 'orbit':
-          // Far cinematic high orbit
-          cam.position.set(
-            p.posX - Math.sin(yaw) * 11,
-            5.2,
-            p.posZ - Math.cos(yaw) * 11
-          );
-          cam.lookAt(p.posX, 0.8, p.posZ);
-          break;
-
-        case 'chase':
-        default:
-          // Dynamic chase camera with speed lag
-          const chaseDist = 6.2 + Math.min(3.0, currentSpeedAbs / 50);
-          const chaseHeight = 2.4;
-          const targetCamX = p.posX - Math.sin(yaw) * chaseDist;
-          const targetCamZ = p.posZ - Math.cos(yaw) * chaseDist;
-
-          cam.position.x += (targetCamX - cam.position.x) * clampedDelta * 8;
-          cam.position.y += (chaseHeight - cam.position.y) * clampedDelta * 8;
-          cam.position.z += (targetCamZ - cam.position.z) * clampedDelta * 8;
-          cam.lookAt(p.posX, 0.9, p.posZ);
-          break;
-      }
+    // 8. Update Camera with Dynamic Camera Physics (FOV, G-force roll, high-speed vibration)
+    if (cameraRef.current && cameraControllerRef.current) {
+      cameraControllerRef.current.update(cameraRef.current, clampedDelta, {
+        posX: p.posX,
+        posZ: p.posZ,
+        yaw: p.yaw,
+        driftAngle: p.driftAngle,
+        speedKmh: p.speedKmh,
+        steeringAngle: p.steeringAngle,
+        cameraMode: p.cameraMode,
+      });
     }
 
     // 9. Update City Environment, Traffic & Mission Checkpoints
@@ -434,6 +412,19 @@ export default function DriveScreen() {
         }
         p.speedKmh = Math.max(0, p.speedKmh * 0.45);
         p.driftPoints = 0;
+      }
+
+      // Check Curb Collision & Lateral Bounce
+      const curbHit = cityEnvRef.current.checkCurbCollision(p.posX, p.posZ, 0.95);
+      if (curbHit.collided) {
+        p.posX += curbHit.normalX * 0.12;
+        p.speedKmh = Math.max(0, p.speedKmh * 0.82);
+        soundEngine.playTireScreech(0.35);
+        if (Platform.OS !== 'web') {
+          try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          } catch {}
+        }
       }
 
       const activeCp = missionManager.getActiveCheckpoint();
@@ -607,6 +598,13 @@ export default function DriveScreen() {
           {hudIsDrifting && (
             <View style={styles.driftAlertBox}>
               <Text style={styles.driftAlertText}>DRIFTING! +{hudDriftPoints} PTS</Text>
+            </View>
+          )}
+
+          {/* Near-Miss / Weave Bonus Popup */}
+          {weaveNotice && weaveNotice.show && (
+            <View style={[styles.driftAlertBox, styles.weaveAlertBox]}>
+              <Text style={styles.weaveAlertText}>{weaveNotice.text}</Text>
             </View>
           )}
         </View>
@@ -965,6 +963,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0.8,
+  },
+  weaveAlertBox: {
+    backgroundColor: 'rgba(234, 88, 12, 0.92)',
+    borderColor: '#f97316',
+    borderWidth: 1,
+    marginTop: 6,
+  },
+  weaveAlertText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1.1,
   },
   topHudRight: {
     flexDirection: 'row',

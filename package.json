@@ -48,5 +48,14 @@
     "build:apk:prod": "npx eas-cli@latest build -p android --profile production",
     "update:ota": "npx eas-cli@latest update --branch production --message 'Hotfix update'"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "expo-av"
+        ]
+      }
+    }
+  }
 }
